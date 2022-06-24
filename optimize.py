@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import mlrose as mls
 from math import pi
 
 
@@ -27,9 +26,10 @@ class Region:
         return self.__repr__()
 
 class Partition:
-    def __init__(self, region: Region, depot: Coordinate):
+    def __init__(self, region: Region, depot: Coordinate, boundaries):
         self.region = region
         self.depot = depot
+        self.boundaries = boundaries
 
 class Demand:
     def __init__(self, location: Coordinate, dmd: float):
@@ -51,11 +51,14 @@ class Demands_generator:
     def generate(self):
         rs = np.random.uniform(low=0, high=self.region.radius, size=self.Num_demands_pts)
         rads = np.random.uniform(low=0, high=2*pi, size=self.Num_demands_pts)
-        demands = [Demand(Coordinate(rs[k], rads[k]), 1) for k in range(self.Num_demands_pts)]
+        demands = np.array([Demand(Coordinate(rs[k], rads[k]), 1) for k in range(self.Num_demands_pts)])
         return demands
         
 
 region = Region(10)
 depot = Coordinate(2, 0.3)
-generator = Demands_generator(region, 10)
+generator = Demands_generator(region, 100)
 demands = generator.generate()
+rds, rads = [d.location.r for d in demands], [d.location.rad for d in demands]
+fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
+ax.scatter(rds, rads)
