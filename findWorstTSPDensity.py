@@ -23,24 +23,25 @@ def findWorstTSPDensity(Rg: Region, demands, t: float=10e-2, epsilon: float=10e-
 
     n = demands.size
     UB, LB = np.inf, -np.inf
+    # Lambda = [optimize.LinearConstraint(np.ones(n).T, 0, 0), optimize.LinearConstraint(np.identity(n), -np.inf, np.ones(n)*Rg.diam)]
     Lambda = [optimize.LinearConstraint(np.ones(n).T, 0, 0)]
     lambda_bounds = optimize.Bounds(-np.inf, Rg.diam)
-
+    lambda0 = np.array([0, 0])
     # while (UB - LB > epsilon):
-    lambda_bar, lambda_bar_func_val = find_analytic_center(lambda x: np.prod(Rg.diam - x), Lambda, lambda_bounds, np.zeros(n))
+    lambda_bar, lambda_bar_func_val = find_analytic_center(lambda x: -np.sum(np.log(Rg.diam - x)), Lambda, lambda_bounds, lambda0)
 
     '''Build an upper bounding f_bar for the original problem (4)'''
 
 
-    return lambda_bar
+    return lambda_bar, lambda_bar_func_val
 
 
-def find_analytic_center(objective, constraints, bounds, lambda0):
-    result = optimize.minimize(objective, lambda0, method='SLSQP', bounds = bounds, constraints=constraints)
+def find_analytic_center(objective, constraints, lambda_bounds, lambda0):
+    result = optimize.minimize(objective, lambda0, method='SLSQP', bounds=lambda_bounds, constraints=constraints)
     return result.x, result.fun
 
 region = Region(10)
 depot = Coordinate(2, 0.3)
-generator = Demands_generator(region, 5)
+generator = Demands_generator(region, 2)
 demands = generator.generate()
 lambda_bar, lambda_func_value = findWorstTSPDensity(region, demands)
