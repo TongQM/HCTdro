@@ -1,16 +1,18 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from math import pi
+from math import pi, cos, sin
 
 
 class Coordinate:
     def __init__(self, r: float, rad: float):
         self.r = r
         self.rad = rad
+        self.x_cd = self.r * cos(self.rad)
+        self.y_cd = self.r * sin(self.rad)
 
     def __repr__(self):
-        return f'({self.r}, {self.rad})'
+        return f'Polar: ({self.r}, {self.rad}) ' + f'|X-Y Plane: ({self.x_cd}, {self.y_cd})'
 
     def __str__(self):
         return self.__repr__()
@@ -18,6 +20,7 @@ class Coordinate:
 class Region:
     def __init__(self, radius: float):
         self.radius = radius
+        self.diam = 2*radius
 
     def __repr__(self) -> str:
         pass
@@ -54,6 +57,15 @@ class Demands_generator:
         demands = np.array([Demand(Coordinate(rs[k], rads[k]), 1) for k in range(self.Num_demands_pts)])
         return demands
         
+class Solution:
+    def __init__(self, region: Region, demands, routes):
+        self.region = region
+        self.demands = demands
+        self.routes = routes
+
+    def evaluate(self):
+        return 0
+
 
 region = Region(10)
 depot = Coordinate(2, 0.3)
