@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from scipy import optimize, integrate, linalg
 from optimize import Region, Coordinate, Demands_generator
 
-n = 10
+n = 2
 np.random.seed(11)
 region = Region(2)
 depot = Coordinate(2, 0.3)
@@ -19,32 +19,30 @@ fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
 ax.scatter(thetas, rs)
 
 
-def integrand(r: float, theta: float, v0, v1, demands, lambdas, t):
+def modified_min_norm(x_cdnt, demands, lambdas):
+    return np.min([linalg.norm(x_cdnt - demands[i].get_cdnt()) - lambdas[i] for i in range(len(demands))])
+
+def integrand(r: float, theta: float, v, demands, lambdas):
     # Calculate a list of ||x-xi|| - lambda_i
     x_cdnt = np.array([r*np.cos(theta), r*np.sin(theta)])
-    modified_norms = [linalg.norm(x_cdnt - demands[i].get_cdnt()) - lambdas[i] for i in range(n)]
-    # print(f'v0: {v0} | v1: {v1} | min: {np.min(modified_norms)}')
-    intgrd = 1/(4*(v0*np.min(modified_norms) + v1))
-    return intgrd*r    # r as Jacobian
+    raw_intgrd = 1/(4*(v[0]*modified_min_norm(x_cdnt, demands, lambdas) + v[1]))
+    return raw_intgrd*r    # r as Jacobian
 
-def objective_function(demands, lambdas, t, v0, v1, region: Region):
-    area, error = integrate.dblquad(integrand, 0.001, 2*np.pi, lambda theta: 0, lambda theta: region.radius, args=(v0, v1, demands, lambdas, t), epsabs=1e-3)
-    return area + v0*t + v1, error
+def objective_function(demands, lambdas, t, v, region: Region):
+    area, error = integrate.dblquad(integrand, 0.001, 2*np.pi, lambda _: 0, lambda _: region.radius, args=(v, demands, lambdas), epsabs=1e-3)
+    return area + v[0]*t + v[1], error
 
-def hf_penalty_objective(demands, lambdas, region: Region):
+def constraint_coeff(demands, lambdas, region: Region):
     x_in_R_constraint = optimize.NonlinearConstraint(lambda x: np.sqrt(x[0]**2 + x[1]**2), 0, region.radius)
-    result = optimize.minimize(lambda x: np.min([linalg.norm(x - demands[i].get_cdnt()) - lambdas[i] for i in range(n)]), x0 = np.ones(2), method='SLSQP', constraints=x_in_R_constraint)
-    return result.fun
+    result = optimize.minimize(lambda x_cdnt: modified_min_norm(x_cdnt, demands, lambdas), x0 = np.ones(2), method='SLSQP', constraints=x_in_R_constraint)
+    return np.array([result.fun, 1])
 
 def minimize_problem14(demands, lambdas, t, region: Region):
-    v0_coeff = hf_penalty_objective(demands, lambdas, region)
-    # print(f'v0_coeff: {v0_coeff}')
-    constraint1 = [optimize.LinearConstraint(np.array([v0_coeff, 1]), 0, np.inf)]
-    bound1 = optimize.Bounds(0, np.inf)
-    objective = lambda v, demands, lambdas, t, region: objective_function(demands, lambdas, t, v[0], v[1], region)[0]
-    result = optimize.minimize(objective, x0=np.ones(2), args=(demands, lambdas, t, region), method='SLSQP', bounds=bound1, constraints=constraint1)
-    return result.x, result.fun, v0_coeff
+    constraints = [optimize.LinearConstraint(constraint_coeff(demands, lambdas, region), 0, np.inf)]
+    bound = optimize.Bounds(0, np.inf)
+    objective = lambda v, demands, lambdas, t, region: objective_function(demands, lambdas, t, v, region)[0]
+    result = optimize.minimize(objective, x0=np.ones(2), args=(demands, lambdas, t, region), method='SLSQP', bounds=bound, constraints=constraints)
+    return result.x, result.fun
 
 
-v, func_value, v0_coeff = minimize_problem14(demands, lambdas_temporary, t_temporary, region)
-# area, error = objective_function(demands, lambdas_temporary, t_temporary, v0_temporary, v1_temporary, region)
+v, func_value = minimize_problem14(demands, lambdas_temporary, t_temporary, region)
