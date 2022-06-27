@@ -5,14 +5,14 @@ from math import pi, cos, sin
 
 
 class Coordinate:
-    def __init__(self, r: float, rad: float):
+    def __init__(self, r: float, theta: float):
         self.r = r
-        self.rad = rad
-        self.x_cd = self.r * cos(self.rad)
-        self.y_cd = self.r * sin(self.rad)
+        self.theta = theta
+        self.x_cd = self.r * cos(self.theta)
+        self.y_cd = self.r * sin(self.theta)
 
     def __repr__(self):
-        return f'Polar: ({self.r}, {self.rad}) ' + f'| X-Y Plane: ({self.x_cd}, {self.y_cd})'
+        return f'Polar: (r: {self.r}, rad: {self.theta}) ' + f'| X-Y Plane: ({self.x_cd}, {self.y_cd})'
 
     def __str__(self):
         return self.__repr__()
@@ -59,8 +59,8 @@ class Demands_generator:
 
     def generate(self):
         rs = np.random.uniform(low=0, high=self.region.radius, size=self.Num_demands_pts)
-        rads = np.random.uniform(low=0, high=2*pi, size=self.Num_demands_pts)
-        demands = np.array([Demand(Coordinate(rs[k], rads[k]), 1) for k in range(self.Num_demands_pts)])
+        thetas = np.random.uniform(low=0, high=2*pi, size=self.Num_demands_pts)
+        demands = np.array([Demand(Coordinate(rs[k], thetas[k]), 1) for k in range(self.Num_demands_pts)])
         return demands
         
 class Solution:
@@ -77,6 +77,6 @@ region = Region(10)
 depot = Coordinate(2, 0.3)
 generator = Demands_generator(region, 100)
 demands = generator.generate()
-rds, rads = [d.location.r for d in demands], [d.location.rad for d in demands]
+rs, thetas = [d.location.r for d in demands], [d.location.theta for d in demands]
 fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
-ax.scatter(rds, rads)
+ax.scatter(thetas, rs)
