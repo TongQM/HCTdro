@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+from problem14 import *
 from optimize import Coordinate, Region, Demands_generator
 from scipy import optimize
 
@@ -23,7 +25,6 @@ def findWorstTSPDensity(Rg: Region, demands, t: float=10e-2, epsilon: float=10e-
 
     n = demands.size
     UB, LB = np.inf, -np.inf
-    # Lambda = [optimize.LinearConstraint(np.ones(n).T, 0, 0), optimize.LinearConstraint(np.identity(n), -np.inf, np.ones(n)*Rg.diam)]
     Lambda = [optimize.LinearConstraint(np.ones(n).T, 0, 0)]
     lambda_bounds = optimize.Bounds(-np.inf, Rg.diam)
     lambda0 = np.array([0, 0])
@@ -44,4 +45,4 @@ region = Region(10)
 depot = Coordinate(2, 0.3)
 generator = Demands_generator(region, 2)
 demands = generator.generate()
-lambda_bar, lambda_func_value = findWorstTSPDensity(region, demands)
+lambda_bar, lambda_bar_func_value = findWorstTSPDensity(region, demands)

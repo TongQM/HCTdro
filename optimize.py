@@ -12,7 +12,7 @@ class Coordinate:
         self.y_cd = self.r * sin(self.rad)
 
     def __repr__(self):
-        return f'Polar: ({self.r}, {self.rad}) ' + f'|X-Y Plane: ({self.x_cd}, {self.y_cd})'
+        return f'Polar: ({self.r}, {self.rad}) ' + f'| X-Y Plane: ({self.x_cd}, {self.y_cd})'
 
     def __str__(self):
         return self.__repr__()
@@ -23,7 +23,10 @@ class Region:
         self.diam = 2*radius
 
     def __repr__(self) -> str:
-        pass
+        fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
+        ax.scatter([], [])
+        plt.show()
+        return f'radius: {self.radius}'
 
     def __str__(self) -> str:
         return self.__repr__()
@@ -38,6 +41,9 @@ class Demand:
     def __init__(self, location: Coordinate, dmd: float):
         self.location = location
         self.dmd = dmd
+
+    def get_cdnt(self):
+        return np.array([self.location.x_cd, self.location.y_cd])
 
     def __repr__(self):
         return self.location.__repr__()
