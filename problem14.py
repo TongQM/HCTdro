@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy import optimize, integrate, linalg
-from optimize import Region, Coordinate, Demands_generator
+from classes import Region, Coordinate, Demands_generator
 
 n = 2
 np.random.seed(11)
@@ -19,13 +19,13 @@ fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
 ax.scatter(thetas, rs)
 
 
-def modified_min_norm(x_cdnt, demands, lambdas):
+def min_modified_norm(x_cdnt, demands, lambdas):
     return np.min([linalg.norm(x_cdnt - demands[i].get_cdnt()) - lambdas[i] for i in range(len(demands))])
 
 def integrand(r: float, theta: float, v, demands, lambdas):
     # Calculate a list of ||x-xi|| - lambda_i
     x_cdnt = np.array([r*np.cos(theta), r*np.sin(theta)])
-    raw_intgrd = 1/(4*(v[0]*modified_min_norm(x_cdnt, demands, lambdas) + v[1]))
+    raw_intgrd = 1/(4*(v[0]*min_modified_norm(x_cdnt, demands, lambdas) + v[1]))
     return raw_intgrd*r    # r as Jacobian
 
 def objective_function(demands, lambdas, t, v, region: Region):
@@ -34,8 +34,8 @@ def objective_function(demands, lambdas, t, v, region: Region):
 
 def constraint_coeff(demands, lambdas, region: Region):
     x_in_R_constraint = optimize.NonlinearConstraint(lambda x: np.sqrt(x[0]**2 + x[1]**2), 0, region.radius)
-    result = optimize.minimize(lambda x_cdnt: modified_min_norm(x_cdnt, demands, lambdas), x0 = np.ones(2), method='SLSQP', constraints=x_in_R_constraint)
-    return np.array([result.fun, 1])
+    result = optimize.minimize(lambda x_cdnt: min_modified_norm(x_cdnt, demands, lambdas), x0 = np.ones(2), method='SLSQP', constraints=x_in_R_constraint)
+    return np.array([result.fun, 1]) # because the constraint below is v0*modified_min_norm + v1 >= 0
 
 def minimize_problem14(demands, lambdas, t, region: Region):
     constraints = [optimize.LinearConstraint(constraint_coeff(demands, lambdas, region), 0, np.inf)]

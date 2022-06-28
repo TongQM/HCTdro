@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from problem14 import *
-from optimize import Coordinate, Region, Demands_generator
+from classes import Coordinate, Region, Demands_generator
 from scipy import optimize
 
 def findWorstTSPDensity(Rg: Region, demands, t: float=10e-2, epsilon: float=10e-5):
