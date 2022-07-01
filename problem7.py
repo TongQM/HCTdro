@@ -24,7 +24,8 @@ def modified_norm(x_cdnt: list[float], i: int, demands: list[Demand], lambdas: l
 
 def integrand(r: float, theta: float, lambdas: list[float], v: list[float], demands: list[Demand]) -> float:
     x_cdnt = np.array([r*np.cos(theta), r*np.sin(theta)])
-    raw_intgrd = np.sum([region_indicator(i, x_cdnt, lambdas, demands) / (v[0]*linalg.norm(x_cdnt - demands[i].get_cdnt()) + v[i+1]) for i in range(len(demands))])
+    xi, vi = categorize_x(x_cdnt, demands, lambdas, v)
+    raw_intgrd = 1 / (v[0]*linalg.norm(x_cdnt - xi.get_cdnt()) + vi)
     return r*raw_intgrd
 
 
@@ -50,7 +51,7 @@ def constraint_objective(x_cdnt, region, v, demands, lambdas):
     return v[0]*linalg.norm(x_cdnt - xi.get_cdnt()) + vi
 
 
-def constraint_func(lambdas, demands, v, region: Region) -> optimize.NonlinearConstraint:
+def constraint_func(lambdas, demands, v, region: Region):
     objective = lambda x_cdnt: constraint_objective(x_cdnt, region, v, demands, lambdas)
     x_in_R_constraint = optimize.NonlinearConstraint(lambda x: np.sqrt(x[0]**2 + x[1]**2), 0, region.radius)
     result = optimize.minimize(objective, x0=np.zeros(2), method='SLSQP', constraints=x_in_R_constraint)
@@ -60,7 +61,7 @@ def constraint_func(lambdas, demands, v, region: Region) -> optimize.NonlinearCo
 def minimize_problem7(lambdas: list[float], demands: list[Demand], t: float, region: Region) -> list[float]:
     constraints = [optimize.NonlinearConstraint(lambda v: constraint_func(lambdas, demands, v, region), 0, np.inf)]
     objective = lambda v, demands, lambdas, t, region: objective_function(demands, lambdas, t, v, region)
-    result = optimize.minimize(objective, x0=np.ones(demands.size + 1), args=(demands, lambdas, t, region), method='SLSQP', constraints=constraints)
+    result = optimize.minimize(objective, x0=np.append(np.zeros(1), np.ones(demands.size)), args=(demands, lambdas, t, region), method='SLSQP', constraints=constraints)
     return result.x, result.fun
 
 

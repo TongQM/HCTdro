@@ -24,6 +24,7 @@ def findWorstTSPDensity(region: Region, demands, t: float=10e-2, epsilon: float=
     n-dimensional variable space.
     '''
 
+    np.random.seed(11)
     n = demands.size
     UB, LB = np.inf, -np.inf
     lambdas_bar = np.zeros(n)
@@ -34,12 +35,12 @@ def findWorstTSPDensity(region: Region, demands, t: float=10e-2, epsilon: float=
         '''Build an upper bounding f_bar for the original problem (4).'''
         v_bar, problem14_func_val = minimize_problem14(demands, lambdas_bar, t, region)
         upper_integrand = lambda r, theta, demands, lambdas_bar, v_bar: r*np.sqrt(f_bar(r, theta, demands, lambdas_bar, v_bar))
-        UB = integrate.dblquad(upper_integrand, 0, 2*np.pi, lambda _: 0, lambda _: region.radius, args=(demands, lambdas_bar, v_bar), epsabs=1e-3)
+        UB, UB_error = integrate.dblquad(upper_integrand, 0, 2*np.pi, lambda _: 0, lambda _: region.radius, args=(demands, lambdas_bar, v_bar), epsabs=1e-3)
 
         '''Build an lower bounding f_tilde that us feasible for (4) by construction.'''
         v_tilde, problem7_func_val = minimize_problem7(lambdas_bar, demands, t, region)
         lower_integrand = lambda r, theta, demands, lambdas_bar, v_tilde: r*np.sqrt(f_tilde(r, theta, demands, lambdas_bar, v_tilde))
-        LB = integrate.dblquad(lower_integrand, 0, 2*np.pi, lambda _: 0, lambda _: region.radius, args=(demands, lambdas_bar, v_tilde), epsabs=1e-3)
+        LB, LB_error = integrate.dblquad(lower_integrand, 0, 2*np.pi, lambda _: 0, lambda _: region.radius, args=(demands, lambdas_bar, v_tilde), epsabs=1e-3)
 
         '''Update g.'''
         g = np.zeros(len(demands))
@@ -66,4 +67,4 @@ region = Region(10)
 depot = Coordinate(2, 0.3)
 generator = Demands_generator(region, 2)
 demands = generator.generate()
-f = findWorstTSPDensity(region, demands)
+# f = findWorstTSPDensity(region, demands)
