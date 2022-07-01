@@ -4,19 +4,19 @@ import matplotlib.pyplot as plt
 from scipy import optimize, integrate, linalg
 from classes import Region, Coordinate, Demands_generator
 
-n = 2
-np.random.seed(11)
-region = Region(2)
-depot = Coordinate(2, 0.3)
-generator = Demands_generator(region, n)
-demands = generator.generate()
-lambdas_temporary = np.zeros(n)
-t_temporary = 1
-v0_temporary = 1
-v1_temporary = 1
-rs, thetas = [d.location.r for d in demands], [d.location.theta for d in demands]
-fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
-ax.scatter(thetas, rs)
+# n = 2
+# np.random.seed(11)
+# region = Region(2)
+# depot = Coordinate(2, 0.3)
+# generator = Demands_generator(region, n)
+# demands = generator.generate()
+# lambdas_temporary = np.zeros(n)
+# t_temporary = 1
+# v0_temporary = 1
+# v1_temporary = 1
+# rs, thetas = [d.location.r for d in demands], [d.location.theta for d in demands]
+# fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
+# ax.scatter(thetas, rs)
 
 
 def min_modified_norm(x_cdnt, demands, lambdas):
@@ -45,4 +45,4 @@ def minimize_problem14(demands, lambdas, t, region: Region):
     return result.x, result.fun
 
 
-v, func_value = minimize_problem14(demands, lambdas_temporary, t_temporary, region)
+# v, func_value = minimize_problem14(demands, lambdas_temporary, t_temporary, region)

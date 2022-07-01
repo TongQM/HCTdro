@@ -5,16 +5,16 @@ import matplotlib.pyplot as plt
 from scipy import optimize, integrate, linalg
 from classes import Region, Coordinate, Demands_generator, Demand
 
-n = 2
-np.random.seed(11)
-region = Region(2)
-depot = Coordinate(2, 0.3)
-generator = Demands_generator(region, n)
-demands = generator.generate()
-lambdas_temporary = np.zeros(n)
-t_temporary = 1
-v0_temporary = 1
-v1_temporary = 1
+# n = 2
+# np.random.seed(11)
+# region = Region(2)
+# depot = Coordinate(2, 0.3)
+# generator = Demands_generator(region, n)
+# demands = generator.generate()
+# lambdas_temporary = np.zeros(n)
+# t_temporary = 1
+# v0_temporary = 1
+# v1_temporary = 1
 
 
 
@@ -64,4 +64,4 @@ def minimize_problem7(lambdas: list[float], demands: list[Demand], t: float, reg
     return result.x, result.fun
 
 
-x, fun_val = minimize_problem7(lambdas_temporary, demands, t_temporary, region)
+# x, fun_val = minimize_problem7(lambdas_temporary, demands, t_temporary, region)

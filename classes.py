@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from scipy import optimize
 from math import pi, cos, sin
 
 
@@ -73,3 +74,27 @@ class Solution:
         return 0
 
 
+class Polyhedron:
+    def __init__(self, A, b, B, c, dimension):
+        '''
+        Polyhedron determined by Ax<=b form and Bx=c
+        '''
+        self.A, self.b = A, b
+        self.B, self.c = B, c
+        self.dim = dimension
+        self.eq_constraints = optimize.LinearConstraint(B, c, c)
+        self.ineq_constraints = optimize.LinearConstraint(A, -np.inf, b)
+
+    def add_ineq_constraint(self, ai, bi):
+        self.A = np.append(self.A, ai.reshape(1, ai.size), axis=0)
+        self.b = np.append(self.b, bi)
+        self.ineq_constraints = optimize.LinearConstraint(self.A, -np.inf, self.b)
+
+    def find_analytic_center(self, x0):
+        objective = lambda x: -np.sum(np.log(self.b - self.A @ x))
+        result = optimize.minimize(objective, x0, method='SLSQP', constraints=(self.ineq_constraints, self.eq_constraints))
+        analytic_center, analytic_center_val = result.x, result.fun
+        return analytic_center, analytic_center_val
+
+    def show_constraints(self):
+        print(f'A: {self.A} \n b: {self.b} \n B: {self.B}, c: {self.c}.')
