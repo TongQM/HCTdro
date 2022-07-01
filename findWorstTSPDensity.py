@@ -1,11 +1,12 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from problem14 import *
+from problem14 import minimize_problem14
+from problem7 import minimize_problem7, constraint_func, categorize_x, region_indicator
 from classes import Coordinate, Region, Demands_generator
-from scipy import optimize
+from scipy import optimize, integrate, linalg
 
-def findWorstTSPDensity(Rg: Region, demands, t: float=10e-2, epsilon: float=10e-5):
+def findWorstTSPDensity(region: Region, demands, t: float=10e-2, epsilon: float=0.1):
     '''
     Algorithm by Carlsson, Behroozl, and Mihic, 2018.
     Code by Yidi Miao, 2022.
@@ -25,24 +26,48 @@ def findWorstTSPDensity(Rg: Region, demands, t: float=10e-2, epsilon: float=10e-
 
     n = demands.size
     UB, LB = np.inf, -np.inf
-    Lambda = [optimize.LinearConstraint(np.ones(n).T, 0, 0)]
-    lambda_bounds = optimize.Bounds(-np.inf, Rg.diam)
+    lambdas_constraints = [optimize.LinearConstraint(np.ones(n).T, 0, 0)]
+    lambdas_bounds = [optimize.Bounds(-np.inf, region.diam)]
     lambda0 = np.array([0, 0])
     # while (UB - LB > epsilon):
-    lambda_bar, lambda_bar_func_val = find_analytic_center(lambda x: -np.sum(np.log(Rg.diam - x)), Lambda, lambda_bounds, lambda0)
+    lambdas_bar, lambdas_bar_func_val = find_analytic_center(lambda x: -np.sum(np.log(region.diam - x)), constraints=lambdas_constraints, bounds=lambdas_bounds, lambda0=lambda0)
 
     '''Build an upper bounding f_bar for the original problem (4)'''
+    v_bar, problem14_func_val = minimize_problem14(demands, lambdas_bar, t, region)
+    upper_integrand = lambda r, theta, demands, lambdas_bar, v_bar: r*np.sqrt(f_bar(r, theta, demands, lambdas_bar, v_bar))
+    UB = integrate.dblquad(upper_integrand, 0, 2*np.pi, lambda _: 0, lambda _: region.radius, args=(demands, lambdas_bar, v_bar))
 
+    '''Build an lower bounding f_tilde that us feasible for (4) by construction'''
+    v_tilde, problem7_func_val = minimize_problem7(lambdas_bar, demands, t, region)
+    lower_integrand = lambda r, theta, demands, lambdas_bar, v_tilde: r*np.sqrt(f_tilde(r, theta, demands, lambdas_bar, v_tilde))
+    LB = integrate.dblquad(lower_integrand, 0, 2*np.pi, lambda _: 0, lambda _: region.radius, args=(demands, lambdas_bar, v_tilde))
 
-    return lambda_bar, lambda_bar_func_val
+    g = np.zeros(len(demands))
+    for i in range(len(demands)):
+        integrandi = lambda r, theta, demands, lambdas_bar, v_bar: r*region_indicator(i, np.array([r*np.cos(theta), r*np.sin(theta)]), lambdas_bar, demands)*f_bar(r, theta, demands, lambdas_bar, v_bar) 
+        g[i] = -integrate.dblquad(integrandi, 0, 2*np.pi, lambda _: 0, lambda _: region.radius, args=(demands, lambdas_bar, v_bar))
+
+    
+
+    return lambdas_bar, lambdas_bar_func_val
 
 
 def find_analytic_center(objective, constraints, lambda_bounds, lambda0):
     result = optimize.minimize(objective, lambda0, method='SLSQP', bounds=lambda_bounds, constraints=constraints)
     return result.x, result.fun
 
+
+def f_bar(r, theta, demands, lambdas_bar, v_bar):
+    x_cdnt = np.array([r*np.cos(theta), r*np.sin(theta)])
+    return pow(1/4 * (v_bar[0]*np.min([linalg.norm(x_cdnt - demands[i].get_cdnt()) - lambdas_bar[i] for i in range(len(demands))]) + v_bar[1]), -2)
+
+def f_tilde(r, theta, demands, lambdas_bar, v_tilde):
+    x_cdnt = np.array([r*np.cos(theta), r*np.sin(theta)])
+    return 1/4 * np.sum([region_indicator(i, x_cdnt, lambdas_bar, demands) * pow((v_tilde[0]*linalg.norm(x_cdnt - demands[i].get_cdnt()) + v_tilde[i+1]), -2) for i in range(len(demands))])
+
+
 region = Region(10)
 depot = Coordinate(2, 0.3)
 generator = Demands_generator(region, 2)
 demands = generator.generate()
-lambda_bar, lambda_bar_func_value = findWorstTSPDensity(region, demands)
+lambdas_bar, lambdas_bar_func_value = findWorstTSPDensity(region, demands)

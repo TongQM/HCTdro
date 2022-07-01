@@ -24,7 +24,8 @@ def modified_norm(x_cdnt: list[float], i: int, demands: list[Demand], lambdas: l
 
 def integrand(r: float, theta: float, lambdas: list[float], v: list[float], demands: list[Demand]) -> float:
     x_cdnt = np.array([r*np.cos(theta), r*np.sin(theta)])
-    return np.sum([region_indicator(i, x_cdnt, lambdas, demands) / (v[0]*linalg.norm(x_cdnt - demands[i].get_cdnt()) + v[i+1]) for i in range(len(demands))])
+    raw_intgrd = np.sum([region_indicator(i, x_cdnt, lambdas, demands) / (v[0]*linalg.norm(x_cdnt - demands[i].get_cdnt()) + v[i+1]) for i in range(len(demands))])
+    return r*raw_intgrd
 
 
 def objective_function(demands: list[Demand], lambdas: list[float], t: float, v: list[float], region: Region) -> float:
@@ -42,6 +43,7 @@ def categorize_x(x_cdnt: list[float], demands: list[Demand], lambdas: list[float
     for i in range(len(demands)):
         if region_indicator(i, x_cdnt, lambdas, demands): return demands[i], v[i+1]
     assert('x not in the region!')
+
 
 def constraint_objective(x_cdnt, region, v, demands, lambdas):
     xi, vi = categorize_x(x_cdnt, demands, lambdas, v)
