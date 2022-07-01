@@ -13,8 +13,6 @@ from classes import Region, Coordinate, Demands_generator, Demand
 # demands = generator.generate()
 # lambdas_temporary = np.zeros(n)
 # t_temporary = 1
-# v0_temporary = 1
-# v1_temporary = 1
 
 
 
@@ -60,8 +58,9 @@ def constraint_func(lambdas, demands, v, region: Region):
 
 def minimize_problem7(lambdas: list[float], demands: list[Demand], t: float, region: Region) -> list[float]:
     constraints = [optimize.NonlinearConstraint(lambda v: constraint_func(lambdas, demands, v, region), 0, np.inf)]
+    bounds = optimize.Bounds(0, np.inf)
     objective = lambda v, demands, lambdas, t, region: objective_function(demands, lambdas, t, v, region)
-    result = optimize.minimize(objective, x0=np.append(np.zeros(1), np.ones(demands.size)), args=(demands, lambdas, t, region), method='SLSQP', constraints=constraints)
+    result = optimize.minimize(objective, x0=np.append(np.zeros(1), np.ones(demands.size)), args=(demands, lambdas, t, region), method='SLSQP',  bounds=bounds)
     return result.x, result.fun
 
 

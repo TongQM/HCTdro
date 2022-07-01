@@ -26,6 +26,7 @@ def findWorstTSPDensity(region: Region, demands, t: float=10e-2, epsilon: float=
 
     np.random.seed(11)
     n = demands.size
+    t = 1
     UB, LB = np.inf, -np.inf
     lambdas_bar = np.zeros(n)
     polyhedron = Polyhedron(np.eye(n), region.diam*np.ones(n), np.ones((1, n)), 0, n)
@@ -46,7 +47,7 @@ def findWorstTSPDensity(region: Region, demands, t: float=10e-2, epsilon: float=
         g = np.zeros(len(demands))
         for i in range(len(demands)):
             integrandi = lambda r, theta, demands, lambdas_bar, v_bar: r*region_indicator(i, np.array([r*np.cos(theta), r*np.sin(theta)]), lambdas_bar, demands)*f_bar(r, theta, demands, lambdas_bar, v_bar) 
-            g[i] = integrate.dblquad(integrandi, 0, 2*np.pi, lambda _: 0, lambda _: region.radius, args=(demands, lambdas_bar, v_bar))
+            g[i], g_error = integrate.dblquad(integrandi, 0, 2*np.pi, lambda _: 0, lambda _: region.radius, args=(demands, lambdas_bar, v_bar))
 
         '''Update polyheron Lambda to get next analytic center.'''
         polyhedron.add_ineq_constraint(g, g.T @ lambdas_bar)
