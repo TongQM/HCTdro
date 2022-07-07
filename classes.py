@@ -83,7 +83,7 @@ class Polyhedron:
         self.B, self.c = B, c
         self.dim = dimension
         self.eq_constraints = optimize.LinearConstraint(B, c, c)
-        self.ineq_constraints = optimize.LinearConstraint(A, -np.inf, b, keep_feasible=False)
+        self.ineq_constraints = optimize.LinearConstraint(A, -np.inf, b + 1e-4, keep_feasible=False)
 
     def add_ineq_constraint(self, ai, bi):
         self.A = np.append(self.A, ai.reshape(1, ai.size), axis=0)
