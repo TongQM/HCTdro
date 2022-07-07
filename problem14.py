@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import numba as nb
 from scipy import optimize, integrate, linalg
 from classes import Region, Coordinate, Demands_generator
 
@@ -18,30 +19,43 @@ from classes import Region, Coordinate, Demands_generator
 # fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
 # ax.scatter(thetas, rs)
 
+#error_model="numpy" -> Don't check for division by zero
+# @nb.njit(error_model="numpy",fastmath=True)
 
-def min_modified_norm(x_cdnt, demands, lambdas):
-    return np.min([linalg.norm(x_cdnt - demands[i].get_cdnt()) - lambdas[i] for i in range(len(demands))])
+@nb.jit(nopython=True)
+def norm_func(x, y):
+    return np.sqrt(np.sum(np.square(x - y)))
 
-def integrand(r: float, theta: float, v, demands, lambdas):
+@nb.jit(nopython=True)
+def min_modified_norm(x_cdnt, demands_locations, lambdas):
+    n = demands_locations.size
+    norms = np.array([norm_func(x_cdnt, demands_locations[i]) - lambdas[i] for i in range(n)])
+    return np.min(norms)
+
+@nb.jit(nopython=True)
+def integrand(r: float, theta: float, v, demands_locations, lambdas):
     # Calculate a list of ||x-xi|| - lambda_i
     x_cdnt = np.array([r*np.cos(theta), r*np.sin(theta)])
-    raw_intgrd = 1/(4*(v[0]*min_modified_norm(x_cdnt, demands, lambdas) + v[1]))
+    raw_intgrd = 1/(4*(v[0]*min_modified_norm(x_cdnt, demands_locations, lambdas) + v[1]))
     return raw_intgrd*r    # r as Jacobian
 
-def objective_function(demands, lambdas, t, v, region: Region):
-    area, error = integrate.dblquad(integrand, 0.001, 2*np.pi, lambda _: 0, lambda _: region.radius, args=(v, demands, lambdas), epsabs=1e-3)
-    return area + v[0]*t + v[1], error
+# @nb.jit(nopython=True)
+def objective_function(v, demands_locations, lambdas, t, region_radius):
+    area, error = integrate.dblquad(integrand, 0, 2*np.pi, lambda _: 0, lambda _: region_radius, args=(v, demands_locations, lambdas), epsabs=1e-3)
+    return area + v[0]*t + v[1]
 
-def constraint_coeff(demands, lambdas, region: Region):
-    x_in_R_constraint = optimize.NonlinearConstraint(lambda x: np.sqrt(x[0]**2 + x[1]**2), 0, region.radius)
-    result = optimize.minimize(lambda x_cdnt: min_modified_norm(x_cdnt, demands, lambdas), x0 = np.ones(2), method='SLSQP', constraints=x_in_R_constraint)
+
+def constraint_coeff(demands_locations, lambdas, region_radius):
+    x_in_R_constraint = optimize.NonlinearConstraint(lambda x: np.sqrt(x[0]**2 + x[1]**2), 0, region_radius)
+    result = optimize.minimize(lambda x_cdnt: min_modified_norm(x_cdnt, demands_locations, lambdas), x0 = np.ones(2), method='SLSQP', constraints=x_in_R_constraint)
     return np.array([result.fun, 1]) # because the constraint below is v0*modified_min_norm + v1 >= 0
 
-def minimize_problem14(demands, lambdas, t, region: Region):
-    constraints = [optimize.LinearConstraint(constraint_coeff(demands, lambdas, region), 0, np.inf)]
+
+def minimize_problem14(demands, lambdas, t, region_radius):
+    demands_locations = np.array([demands[i].get_cdnt() for i in range(len(demands))])
+    constraints = [optimize.LinearConstraint(constraint_coeff(demands_locations, lambdas, region_radius), 0, np.inf)]
     bound = optimize.Bounds(0, np.inf)
-    objective = lambda v, demands, lambdas, t, region: objective_function(demands, lambdas, t, v, region)[0]
-    result = optimize.minimize(objective, x0=np.ones(2), args=(demands, lambdas, t, region), method='SLSQP', bounds=bound, constraints=constraints)
+    result = optimize.minimize(objective_function, x0=np.ones(2), args=(demands_locations, lambdas, t, region_radius),method='SLSQP', bounds=bound, constraints=constraints)
     return result.x, result.fun
 
 

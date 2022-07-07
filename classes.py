@@ -83,7 +83,7 @@ class Polyhedron:
         self.B, self.c = B, c
         self.dim = dimension
         self.eq_constraints = optimize.LinearConstraint(B, c, c)
-        self.ineq_constraints = optimize.LinearConstraint(A, -np.inf, b)
+        self.ineq_constraints = optimize.LinearConstraint(A, -np.inf, b, keep_feasible=False)
 
     def add_ineq_constraint(self, ai, bi):
         self.A = np.append(self.A, ai.reshape(1, ai.size), axis=0)
@@ -91,9 +91,10 @@ class Polyhedron:
         self.ineq_constraints = optimize.LinearConstraint(self.A, -np.inf, self.b)
 
     def find_analytic_center(self, x0):
-        objective = lambda x: -np.sum(np.log(self.b - self.A @ x))
+        objective = lambda x: -np.sum(np.log(self.b - self.A @ x + 1e-6))  # To ensure log(b - A @ x) is defined.
         result = optimize.minimize(objective, x0, method='SLSQP', constraints=(self.ineq_constraints, self.eq_constraints))
-        analytic_center, analytic_center_val = result.x, result.fun
+        assert result.success, result.message
+        analytic_center, analytic_center_val = result.x, result.fun            
         return analytic_center, analytic_center_val
 
     def show_constraints(self):
