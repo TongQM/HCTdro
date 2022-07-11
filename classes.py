@@ -1,3 +1,4 @@
+from unittest import result
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -82,8 +83,10 @@ class Polyhedron:
         self.A, self.b = A, b
         self.B, self.c = B, c
         self.dim = dimension
-        self.eq_constraints = optimize.LinearConstraint(B, c, c)
-        self.ineq_constraints = optimize.LinearConstraint(A, -np.inf, b + 1e-4, keep_feasible=False)
+        self.eq_constraints = {'type': 'eq', 'fun': lambda x: self.B @ x - self.c , 'jac': lambda _: self.B}
+        # optimize.LinearConstraint(B, c, c)
+        self.ineq_constraints = {'type': 'ineq', 'fun': lambda x: self.b - self.A @ x + 1e-6, 'jac': lambda _: -self.A}
+        # optimize.LinearConstraint(A, -np.inf, b + 1e-4, keep_feasible=False)
 
     def add_ineq_constraint(self, ai, bi):
         self.A = np.append(self.A, ai.reshape(1, ai.size), axis=0)
@@ -92,10 +95,11 @@ class Polyhedron:
 
     def find_analytic_center(self, x0):
         objective = lambda x: -np.sum(np.log(self.b - self.A @ x + 1e-6))  # To ensure log(b - A @ x) is defined.
-        result = optimize.minimize(objective, x0, method='SLSQP', constraints=(self.ineq_constraints, self.eq_constraints))
+        objective_jac = lambda x: np.sum((self.A.T / (self.b - self.A @ x + 1e-6)), axis=1)
+        result = optimize.minimize(objective, x0, method='SLSQP', constraints=[self.ineq_constraints, self.eq_constraints], jac=objective_jac, options={'disp': True})
         assert result.success, result.message
         analytic_center, analytic_center_val = result.x, result.fun            
         return analytic_center, analytic_center_val
 
     def show_constraints(self):
-        print(f'A: {self.A} \n b: {self.b} \n B: {self.B}, c: {self.c}.')
+        print(f'A: {self.A} \n b: {self.b} \n B: {self.B} \n c: {self.c}.')

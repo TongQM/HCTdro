@@ -4,10 +4,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numba as nb
 from scipy import optimize, integrate, linalg
-from torch import FloatStorage
 from classes import Region, Coordinate, Demands_generator, Demand
 
-
+tol = 1e-3
 # Instrumental functions
 @nb.jit(nopython=True)
 def norm_func(x, y):
@@ -46,32 +45,35 @@ def jac_integrand0(r: float, theta: float, lambdas: list[float], v: list[float],
     the_norm = norm_func(x_cdnt, xi)
     return -r * the_norm/pow(v[0]*the_norm + vi, 2)
 
+'''NOTE: i is the index of v, whose values range from 0 to n
+      But j is the index of regions, whose values range from 1 to n.
+      For indexes of demands_locations (0 to n-1), we need to offset j by subtracting one.'''
+
 @nb.njit
 def jac_integrandj(r: float, theta: float, lambdas: list[float], v: list[float], demands_locations: list[list[float]], j: int):
     x_cdnt = np.array([r*np.cos(theta), r*np.sin(theta)])
-    if region_indicator(j, x_cdnt, lambdas, demands_locations) == 0: return 0
-    return -r / pow(v[0] * norm_func(x_cdnt, demands_locations[j]) + v[j], 2)
+    if region_indicator(j-1, x_cdnt, lambdas, demands_locations) == 0: return 0
+    return -r / pow(v[0] * norm_func(x_cdnt, demands_locations[j-1]) + v[j], 2)
 
 
 def objective_function(v: list[float], demands_locations: list[list[float]], lambdas: list[float], t: float, region_radius) -> float:
-    sum_integral, error = integrate.dblquad(integrand, 0, 2*np.pi, lambda _: 0, lambda _: region_radius, args=(lambdas, v, demands_locations), epsabs=1e-3)
+    sum_integral, error = integrate.dblquad(integrand, 0, 2*np.pi, lambda _: 0, lambda _: region_radius, args=(lambdas, v, demands_locations), epsabs=tol)
     return 1/4*sum_integral + v[0]*t + np.mean(v[1:])
 
 
 def objective_jac(v: list[float], demands_locations: list[list[float]], lambdas: list[float], t: float, region_radius):
     n = demands_locations.shape[0]
     jac = np.zeros(n + 1)
-    jac[0] = 1/4 * integrate.dblquad(jac_integrand0, 0, 2*np.pi, lambda _: 0, lambda _: region_radius, args=(lambdas, v, demands_locations), epsabs=1e-3)[0] + t
+    jac[0] = 1/4 * integrate.dblquad(jac_integrand0, 0, 2*np.pi, lambda _: 0, lambda _: region_radius, args=(lambdas, v, demands_locations), epsabs=tol)[0] + t
     for j in range(1, n+1):
-        print(f'j: {j}, v: {v}.')
-        jac[j] = 1/4 * integrate.dblquad(jac_integrandj, 0, 2*np.pi, lambda _: 0, lambda _: region_radius, args=(lambdas, v, demands_locations, j), epsabs=1e-3)[0] + 1/n
+        jac[j] = 1/4 * integrate.dblquad(jac_integrandj, 0, 2*np.pi, lambda _: 0, lambda _: region_radius, args=(lambdas, v, demands_locations, j), epsabs=tol)[0] + 1/n
     return jac
 
 def minimize_problem7(lambdas: list[float], demands: list[Demand], t: float, region_radius) -> list[float]:
     # constraints = [optimize.NonlinearConstraint(lambda v: constraint_func(lambdas, demands, v, region_radius), 0, np.inf)]
     demands_locations = np.array([demands[i].get_cdnt() for i in range(len(demands))])
     bounds = optimize.Bounds(0, np.inf)
-    result = optimize.minimize(objective_function, x0=np.append(np.zeros(1), np.ones(demands.size)), args=(demands_locations, lambdas, t, region_radius), jac=objective_jac, method='SLSQP',  bounds=bounds)
+    result = optimize.minimize(objective_function, x0=np.append(np.zeros(1), np.ones(demands.shape[0])), args=(demands_locations, lambdas, t, region_radius), jac=objective_jac, method='SLSQP',  bounds=bounds)
     return result.x, result.fun
 
 
