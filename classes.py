@@ -60,9 +60,9 @@ class Demands_generator:
         self.Num_demands_pts = Num_demands_pts
 
     def generate(self):
-        rs = np.random.uniform(low=0, high=self.region.radius, size=self.Num_demands_pts)
-        thetas = np.random.uniform(low=0, high=2*pi, size=self.Num_demands_pts)
-        demands = np.array([Demand(Coordinate(rs[k], thetas[k]), 1) for k in range(self.Num_demands_pts)])
+        self.rs = np.random.uniform(low=0, high=self.region.radius, size=self.Num_demands_pts)
+        self.thetas = np.random.uniform(low=0, high=2*pi, size=self.Num_demands_pts)
+        demands = np.array([Demand(Coordinate(self.rs[k], self.thetas[k]), 1) for k in range(self.Num_demands_pts)])
         return demands
         
 class Solution:
@@ -96,7 +96,7 @@ class Polyhedron:
     def find_analytic_center(self, x0):
         objective = lambda x: -np.sum(np.log(self.b - self.A @ x + 1e-6))  # To ensure log(b - A @ x) is defined.
         objective_jac = lambda x: np.sum((self.A.T / (self.b - self.A @ x + 1e-6)), axis=1)
-        result = optimize.minimize(objective, x0, method='SLSQP', constraints=[self.ineq_constraints, self.eq_constraints], jac=objective_jac, options={'disp': True})
+        result = optimize.minimize(objective, x0, method='SLSQP', constraints=[self.ineq_constraints, self.eq_constraints], jac=objective_jac, options={'maxiter': 1000,'disp': True})
         assert result.success, result.message
         analytic_center, analytic_center_val = result.x, result.fun            
         return analytic_center, analytic_center_val
