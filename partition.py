@@ -24,13 +24,14 @@ class Grids:
     def __init__(self, num_grid) -> None:
         self.num_grid = num_grid
         self.grids = np.linspace(0, 2*np.pi, self.num_grid, endpoint=False)
+        
     
      
 
 
 class Partition:
     def __init__(self, num_districts, location) -> None:
-        
+        return 
 
 
 class District:
