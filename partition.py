@@ -42,8 +42,6 @@ class District:
 
     def find_optimal_tsp_solution(self):
         self.distance_matrix = euclidean_distance_matrix(self.demands_within_locations)
-        # self.permutation, self.distance = solve_tsp_simulated_annealing(self.distance_matrix)
-        # self.permutation, self.distance = solve_tsp_local_search(self.distance_matrix)
         self.permutation, self.distance = solve_tsp_dynamic_programming(self.distance_matrix)
         return self.permutation, self.distance
 
