@@ -4,20 +4,33 @@ import numba as nb
 from classes import Coordinate, Region, Demands_generator, Polyhedron
 from scipy import integrate, linalg
 from findWorstTSPDensity import findWorstTSPDensity
-from python_tsp.distances  import euclidean_distance_matrix
+from python_tsp.distances import euclidean_distance_matrix
 from python_tsp.exact import solve_tsp_dynamic_programming
+from python_tsp.heuristics import solve_tsp_simulated_annealing, solve_tsp_local_search
 
 
 region = Region(1)
 depot = Coordinate(2, 0.3)
-generator = Demands_generator(region, 5)
 t, epsilon = 0.3, 1
 tol = 1e-4
 
 
-grids = np.linspace(0, 2*np.pi, 5, endpoint=True)
-generator = Demands_generator(region, 30)
+grids = np.linspace(0, 2*np.pi, 10, endpoint=False)
+generator = Demands_generator(region, 20)
 demands = generator.generate()
+
+
+class Grids:
+    def __init__(self, num_grid) -> None:
+        self.num_grid = num_grid
+        self.grids = np.linspace(0, 2*np.pi, self.num_grid, endpoint=False)
+    
+     
+
+
+class Partition:
+    def __init__(self, num_districts, location) -> None:
+        
 
 
 class District:
@@ -28,6 +41,8 @@ class District:
 
     def find_optimal_tsp_solution(self):
         self.distance_matrix = euclidean_distance_matrix(self.demands_within_locations)
+        # self.permutation, self.distance = solve_tsp_simulated_annealing(self.distance_matrix)
+        # self.permutation, self.distance = solve_tsp_local_search(self.distance_matrix)
         self.permutation, self.distance = solve_tsp_dynamic_programming(self.distance_matrix)
         return self.permutation, self.distance
 
@@ -36,6 +51,7 @@ class District:
 
     def __str__(self) -> str:
         return self.__repr__()
+
 
 def district_indicator(demand, partition):
     for ind in range(len(partition)-1):
@@ -51,9 +67,9 @@ def partition_demands(demands, partition):
     return demands_partition
 
 
-for i in grids:
-    for j in grids:
-        partition = [0, min(i, j), max(i, j), 2*np.pi]
+for i in range(1, len(grids)):
+    for j in range(i+1, len(grids)):
+        partition = [0, grids[i], grids[j], 2*np.pi]
         M = len(partition) - 1
         demands_partition = partition_demands(demands, partition)
         districts = [District((partition[k], partition[k+1]), demands_partition[k]) for k in range(M)]

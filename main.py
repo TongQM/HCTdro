@@ -21,12 +21,10 @@ def show_density(f_tilde, resolution=100, t=1, dmd_index=0):
 
     # Plot the surface.
     plt.grid(False)
-    # ax.pcolormesh(P, R, Z, cmap=plt.colormaps['Greys'])
-    # actual plotting
-    ctf = ax.contourf(P, R, Z, cmap=cm.binary)
+    ctf = ax.pcolormesh(P, R, Z, cmap=plt.colormaps['Greys'])
     ax.scatter(generator.thetas, generator.rs, c='yellow')
 
-    # add color bar
+    # Add color bar
     plt.colorbar(ctf)
 
     # Tweak the limits and add latex math labels.
@@ -41,7 +39,7 @@ def show_density(f_tilde, resolution=100, t=1, dmd_index=0):
 region = Region(1)
 depot = Coordinate(2, 0.3)
 generator = Demands_generator(region, 5)
-t, epsilon = 0.3, 1
+t, epsilon = 0.3, 0.1
 tol = 1e-4
 
 plot_resolution = 100
@@ -53,4 +51,3 @@ f_tilde = findWorstTSPDensity(region, demands, t, epsilon, tol)
 f_tilde_area, error = integrate.dblquad(lambda r, theta: r*f_tilde(r, theta), 0, 2*np.pi, lambda _: 0, lambda _: region.radius)
 print(f'The measure of the whole region is {f_tilde_area}.')
 show_density(f_tilde, plot_resolution, t)
-

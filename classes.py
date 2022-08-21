@@ -14,7 +14,7 @@ class Coordinate:
         self.y_cd = self.r * sin(self.theta)
 
     def __repr__(self):
-        return f'Polar: (r: {self.r}, rad: {self.theta}) ' + f'| X-Y Plane: ({self.x_cd}, {self.y_cd})'
+        return f'Polar: (r: {self.r}, theta: {self.theta}) ' + f'| X-Y Plane: ({self.x_cd}, {self.y_cd})'
 
     def __str__(self):
         return self.__repr__()

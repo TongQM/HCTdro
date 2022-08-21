@@ -54,7 +54,7 @@ def findWorstTSPDensity(region: Region, demands, t: float=1, epsilon: float=0.1,
         lower_integrand = lambda r, theta, demands_locations, lambdas_bar, v_tilde: r*np.sqrt(f_tilde(r, theta, demands_locations, lambdas_bar, v_tilde))
         LB, LB_error = integrate.dblquad(lower_integrand, 0, 2*np.pi, lambda _: 0, lambda _: region.radius, args=(demands_locations, lambdas_bar, v_tilde), epsabs=tol)
         time3 = time.time()
-        print(f'Find lower bound: Lower bound is {LB}, with error {LB_error}, took {time3 - time2}s.')
+        print(f'Find lower bound: Lower bound is {LB}, with error {LB_error}, took {time3 - time2}s.\n')
 
         '''Update g.'''
         g = np.zeros(len(demands))
@@ -65,7 +65,7 @@ def findWorstTSPDensity(region: Region, demands, t: float=1, epsilon: float=0.1,
         '''Update polyheron Lambda to get next analytic center.'''
         polyhedron.add_ineq_constraint(g, g.T @ lambdas_bar)
         time4 = time.time()
-        print(f'It took {time4 - time3}s to get vector g.')
+        print(f'It took {time4 - time3}s to get vector g.\n')
 
         endtime = time.time()
         print(f'End of iteration {k}.\n  The whole iteration took {endtime - starttime}s.\n')
