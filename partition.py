@@ -21,17 +21,18 @@ demands = generator.generate()
 
 
 class Grids:
-    def __init__(self, num_grid) -> None:
+    def __init__(self, num_grid):
         self.num_grid = num_grid
-        self.grids = np.linspace(0, 2*np.pi, self.num_grid, endpoint=False)
-        
-    
-     
+        self.grids = np.linspace(0, 2*np.pi, self.num_grid, endpoint=False)     
 
 
 class Partition:
-    def __init__(self, num_districts, location) -> None:
-        return 
+    def __init__(self, num_districts, location):
+        self.num_districts = num_districts
+        self.location = location
+
+    def next_partition(self):
+        return
 
 
 class District:
@@ -73,7 +74,6 @@ for i in range(1, len(grids)):
         demands_partition = partition_demands(demands, partition)
         districts = [District((partition[k], partition[k+1]), demands_partition[k]) for k in range(M)]
         districts_tsp = [dist.find_optimal_tsp_solution() for dist in districts]
-
 
 
 # def calculate_fixed_route_cost(cost, beta, demands, f_tilde):
