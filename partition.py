@@ -74,6 +74,3 @@ for i in range(1, len(grids)):
         demands_partition = partition_demands(demands, partition)
         districts = [District((partition[k], partition[k+1]), demands_partition[k]) for k in range(M)]
         districts_tsp = [dist.find_optimal_tsp_solution() for dist in districts]
-
-
-# def calculate_fixed_route_cost(cost, beta, demands, f_tilde):

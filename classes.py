@@ -3,7 +3,42 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy import optimize
+import gurobipy as gp
 from math import pi, cos, sin
+import os
+
+
+def append_df_to_csv(filename, df, sep=",", header=True, index=False):
+    """
+    Append a DataFrame [df] to a CSV file [filename].
+    If [filename] doesn't exist, this function will create it.
+
+    This function also prints the number of rows in the existing CSV file
+    before appending the new data.
+
+    Parameters:
+      filename : String. File path or existing CSV file
+                 (Example: '/path/to/file.csv')
+      df : DataFrame to save to CSV file
+      sep : String. Delimiter to use, default is comma (',')
+      header : Boolean or list of string. Write out the column names. If a list of strings
+               is given it is assumed to be aliases for the column names
+      index : Boolean. Write row names (index)
+    """
+    # Check if file exists
+    file_exists = os.path.isfile(filename)
+
+    if file_exists:
+        # Read the existing CSV to find the number of rows
+        existing_df = pd.read_csv(filename, sep=sep)
+        # print(f"Number of rows in existing CSV: {len(existing_df)}")
+
+        # Append without header
+        df.to_csv(filename, mode='a', sep=sep, header=False, index=index)
+    else:
+        # If file doesn't exist, create it with header
+        df.to_csv(filename, mode='w', sep=sep, header=header, index=index)
+        # print("Created new CSV file.")
 
 
 class Coordinate:
@@ -25,9 +60,9 @@ class Region:
         self.diam = 2*radius
 
     def __repr__(self) -> str:
-        fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
-        ax.scatter([], [])
-        plt.show()
+        # fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
+        # ax.scatter([], [])
+        # plt.show()
         return f'radius: {self.radius}'
 
     def __str__(self) -> str:
@@ -55,11 +90,13 @@ class Demand:
 
 
 class Demands_generator:
-    def __init__(self, region: Region, Num_demands_pts: int):
+    def __init__(self, region: Region, Num_demands_pts: int, seed=11):
         self.region = region
         self.Num_demands_pts = Num_demands_pts
+        self.seed = seed
 
     def generate(self):
+        np.random.seed(self.seed)
         self.rs = np.random.uniform(low=0, high=self.region.radius, size=self.Num_demands_pts)
         self.thetas = np.random.uniform(low=0, high=2*pi, size=self.Num_demands_pts)
         demands = np.array([Demand(Coordinate(self.rs[k], self.thetas[k]), 1) for k in range(self.Num_demands_pts)])
@@ -94,9 +131,20 @@ class Polyhedron:
         self.ineq_constraints = optimize.LinearConstraint(self.A, -np.inf, self.b)
 
     def find_analytic_center(self, x0):
+        # Find a feasible solution to the problem first
+        find_feasible_sol = gp.Model('find_feasible_sol')
+        find_feasible_sol.setParam('OutputFlag', 1)
+        x = find_feasible_sol.addMVar(shape=self.dim, lb=-1, ub=1, name='x')
+        find_feasible_sol.addConstr(self.B @ x == self.c)
+        find_feasible_sol.addConstr(self.A @ x <= self.b)
+        find_feasible_sol.setObjective(0, gp.GRB.MINIMIZE)
+        find_feasible_sol.optimize()
+        # assert find_feasible_sol.status == gp.GRB.OPTIMAL, find_feasible_sol.status
+        x0 = x.X
+
         objective = lambda x: -np.sum(np.log(self.b - self.A @ x + 1e-6))  # To ensure log(b - A @ x) is defined.
-        objective_jac = lambda x: np.sum((self.A.T / (self.b - self.A @ x + 1e-6)), axis=1)
-        result = optimize.minimize(objective, x0, method='SLSQP', constraints=[self.ineq_constraints, self.eq_constraints], jac=objective_jac, options={'maxiter': 1000,'disp': True})
+        objective_jac = lambda x: np.sum(np.array([self.A[i, :]/(self.b[i] - self.A[i, :] @ x) for i in range(self.A.shape[0])]), axis=0)
+        result = optimize.minimize(objective, x0, method='SLSQP', constraints=[self.ineq_constraints, self.eq_constraints], jac='cs', options={'maxiter': 1000,'disp': True})
         assert result.success, result.message
         analytic_center, analytic_center_val = result.x, result.fun            
         return analytic_center, analytic_center_val

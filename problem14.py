@@ -63,5 +63,3 @@ def minimize_problem14(demands, lambdas, t, region_radius):
     result = optimize.minimize(objective_function, x0=np.array([0, 1]), args=(demands_locations, lambdas, t, region_radius), jac=objective_jac, method='SLSQP', bounds=bound, constraints=constraints_dict)
     return result.x, result.fun
 
-
-# v, func_value = minimize_problem14(demands, lambdas_temporary, t_temporary, region)
