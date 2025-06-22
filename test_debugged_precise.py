@@ -13,9 +13,13 @@ from scipy import integrate
 def main():
     parser = argparse.ArgumentParser(description="Test the fixed precise method with a variable number of demands.")
     parser.add_argument('--num_demands', type=int, default=5, help='Number of demand points to test.')
+    parser.add_argument('--max_iterations', type=int, default=5, help='Maximum number of analytic center iterations to allow.')
+    parser.add_argument('--epsilon', type=float, default=0.2, help='Convergence tolerance epsilon.')
     args = parser.parse_args()
 
     num_demands = args.num_demands
+    max_iter = args.max_iterations
+    epsilon = args.epsilon
     
     print("============================================================")
     print("TESTING FIXED PRECISE METHOD")
@@ -29,9 +33,6 @@ def main():
     empirical_distribution = EmpiricalDistribution(grid)
     empirical_distribution.generate_random_samples(num_demands, seed=42)
     empirical_distribution.normalize()
-
-    epsilon = 0.2  # More relaxed epsilon for testing
-    max_iter = 5  # Reduced iterations for quicker testing
 
     print("Test configuration:")
     print(f"  Region: {region}")

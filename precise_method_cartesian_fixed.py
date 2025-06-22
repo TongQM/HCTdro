@@ -15,7 +15,7 @@ def find_worst_tsp_density_precise_fixed(region: SquareRegion, demands, t: float
     '''
     Fixed precise method: Analytic center cutting plane method with correct lower bound calculation.
     '''
-    n = demands.shape[0]
+    n = len(demands)
     UB, LB = np.inf, -np.inf
     lambdas_bar = np.zeros(n)
     bound_value = min(region.side_length, 0.5)
@@ -29,7 +29,9 @@ def find_worst_tsp_density_precise_fixed(region: SquareRegion, demands, t: float
     k = 1
     best_lambdas = None
     best_v_tilde = None
-    best_demands_locations = None
+    
+    # Compute demand locations once
+    demands_locations = np.array([d.get_coordinates() for d in demands])
     
     while (abs(UB - LB) > epsilon) and (k <= max_iterations):
         print(f'\nIteration {k}:')
@@ -37,7 +39,7 @@ def find_worst_tsp_density_precise_fixed(region: SquareRegion, demands, t: float
         
         try:
             lambdas_bar, _ = polyhedron.find_analytic_center_with_phase1(lambdas_bar)
-            demands_locations = np.array([d.get_coordinates() for d in demands])
+            # demands_locations is fixed, do not update
             
             # --- Corrected Upper Bound Calculation ---
             v_bar, _ = minimize_problem14_cartesian_fixed(demands, lambdas_bar, t, region)
@@ -52,11 +54,9 @@ def find_worst_tsp_density_precise_fixed(region: SquareRegion, demands, t: float
             if best_lambdas is None or LB > best_lambdas[1]:
                 best_lambdas = (lambdas_bar.copy(), LB)
                 best_v_tilde = v_tilde.copy()
-                best_demands_locations = demands_locations.copy()
             
-            g = np.zeros(len(demands))
-            for i in range(len(demands)):
-                # --- Corrected g-vector Calculation ---
+            g = np.zeros(n)
+            for i in range(n):
                 g[i] = compute_g_integral_torchquad_fixed(i, demands_locations, lambdas_bar, v_bar, region)
             
             if np.linalg.norm(g) > 1e-6:
@@ -78,7 +78,7 @@ def find_worst_tsp_density_precise_fixed(region: SquareRegion, demands, t: float
         # The f_tilde function constructed from the optimal v_tilde should already integrate to 1.
         # The final returned function is the unnormalized f_tilde.
         print(f"\nAlgorithm finished. Returning density function based on best LB={best_lambdas[1]:.6f}")
-        return lambda x, y: f_tilde_cartesian(x, y, best_demands_locations, best_lambdas[0], best_v_tilde)
+        return lambda x, y: f_tilde_cartesian(x, y, demands_locations, best_lambdas[0], best_v_tilde)
     else:
         # Fallback to uniform distribution if no solution was found
         print("\nAlgorithm failed to find a solution. Returning uniform distribution.")
@@ -125,7 +125,7 @@ def minimize_problem14_cartesian_fixed(demands, lambdas, t, region):
 
     # v0 > 0, v1 >= 0
     # Set a small positive lower bound for v0 to ensure it's non-trivial
-    bounds = [(1e-6, None), (0, None)]
+    bounds = [(0, None), (0, None)]
     
     # Constraint: v0 * min_dist_lambda + v1 >= 0
     constraints = [{'type': 'ineq', 'fun': lambda v: v[0] * min_dist_lambda + v[1]}]
@@ -191,8 +191,8 @@ def get_subregion_index(X, demands_locations, lambdas_tensor):
 
 def f_tilde_cartesian(x, y, demands_locations, lambdas, v_tilde):
     """
-    Computes the value of the piecewise density function f_tilde at a batch of points.
-    Accepts tensor inputs for x and y from torchquad.
+    Computes the value of the piecewise density function f_tilde at a batch of points or a single point.
+    Accepts tensor inputs for x and y from torchquad, or scalars for single-point evaluation.
     """
     # Ensure x and y are tensors
     if not isinstance(x, torch.Tensor):
@@ -200,8 +200,13 @@ def f_tilde_cartesian(x, y, demands_locations, lambdas, v_tilde):
     if not isinstance(y, torch.Tensor):
         y = torch.tensor(y)
 
-    # Combine x and y into a single points tensor
-    points = torch.stack([x, y], dim=-1).double()
+    # If x and y are scalars (0-dim), convert to 1-dim
+    if x.dim() == 0 and y.dim() == 0:
+        points = torch.stack([x, y], dim=0).double().unsqueeze(0)  # shape (1, 2)
+    elif x.dim() == 1 and y.dim() == 1 and x.shape == y.shape:
+        points = torch.stack([x, y], dim=-1).double()  # shape (N, 2)
+    else:
+        raise ValueError("x and y must be both scalars or both 1D tensors of the same shape.")
 
     demands_tensor = torch.from_numpy(demands_locations).to(points.device)
     lambdas_tensor = torch.from_numpy(lambdas).to(points.device)
@@ -219,7 +224,11 @@ def f_tilde_cartesian(x, y, demands_locations, lambdas, v_tilde):
     denominators = v_tilde_tensor[0] * distances + selected_v
     
     # Definition from paper: f_tilde = (1/4) * (v0*||x-xi|| + vi)^-2
-    return 0.25 / ((denominators + 1e-9)**2)
+    result = 0.25 / ((denominators + 1e-9)**2)
+    # If input was a single point, return a scalar
+    if result.numel() == 1:
+        return result.item()
+    return result
 
 def integrand_lower_torchquad(X, demands_locations, lambdas, v_tilde):
     demands_tensor = torch.from_numpy(demands_locations).to(X.device)

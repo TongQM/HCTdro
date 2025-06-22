@@ -182,10 +182,10 @@ class Polyhedron:
         res = minimize(
             fun=objective,
             x0=x0_feasible,
-            method='trust-constr',
+            method='SLSQP',
             jac=objective_jac,
             constraints=[self.eq_constraints, self.ineq_constraints],
-            options={'disp': False, 'maxiter': 200}
+            options={'disp': False, 'maxiter': 2000}
         )
 
         if res.success:
