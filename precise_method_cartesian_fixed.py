@@ -11,7 +11,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-def find_worst_tsp_density_precise_fixed(region: SquareRegion, demands, t: float = 1, epsilon: float = 0.1, tol: float = 1e-4, use_torchquad: bool = True, max_iterations: int = 5):
+def find_worst_tsp_density_precise_fixed(region: SquareRegion, demands, t: float = 1, epsilon: float = 0.1, tol: float = 1e-4, use_torchquad: bool = True, max_iterations: int = 5, return_params: bool = False, return_history: bool = False):
     '''
     Fixed precise method: Analytic center cutting plane method with correct lower bound calculation.
     '''
@@ -19,6 +19,8 @@ def find_worst_tsp_density_precise_fixed(region: SquareRegion, demands, t: float
     UB, LB = np.inf, -np.inf
     lambdas_bar = np.zeros(n)
     bound_value = min(region.side_length, 0.5)
+    # For convergence history
+    ub_hist, lb_hist, gap_hist = [], [], []
     
     A = np.eye(n)
     b = bound_value * np.ones(n)
@@ -32,6 +34,11 @@ def find_worst_tsp_density_precise_fixed(region: SquareRegion, demands, t: float
     
     # Compute demand locations once
     demands_locations = np.array([d.get_coordinates() for d in demands])
+    
+    stagnation_counter = 0
+    stagnation_tol = 1e-6
+    stagnation_window = 5
+    last_ub, last_lb, last_gap = None, None, None
     
     while (abs(UB - LB) > epsilon) and (k <= max_iterations):
         print(f'\nIteration {k}:')
@@ -50,6 +57,22 @@ def find_worst_tsp_density_precise_fixed(region: SquareRegion, demands, t: float
             LB = compute_LB_from_v_tilde(demands_locations, lambdas_bar, v_tilde, region)
             
             print(f"  UB={UB:.4f}, LB={LB:.4f}, gap={abs(UB-LB):.4f}")
+            ub_hist.append(UB)
+            lb_hist.append(LB)
+            gap_hist.append(abs(UB-LB))
+
+            # Stagnation detection
+            if last_ub is not None and last_lb is not None and last_gap is not None:
+                if (abs(UB - last_ub) < stagnation_tol and
+                    abs(LB - last_lb) < stagnation_tol and
+                    abs(abs(UB-LB) - last_gap) < stagnation_tol):
+                    stagnation_counter += 1
+                else:
+                    stagnation_counter = 0
+                if stagnation_counter >= stagnation_window:
+                    print(f"Stagnation detected: UB/LB/gap unchanged for {stagnation_window} iterations. Stopping.")
+                    break
+            last_ub, last_lb, last_gap = UB, LB, abs(UB-LB)
 
             if best_lambdas is None or LB > best_lambdas[1]:
                 best_lambdas = (lambdas_bar.copy(), LB)
@@ -62,7 +85,8 @@ def find_worst_tsp_density_precise_fixed(region: SquareRegion, demands, t: float
             if np.linalg.norm(g) > 1e-6:
                 g = g / np.linalg.norm(g)
             
-            polyhedron.add_ineq_constraint(g, g.T @ lambdas_bar + 1e-8)
+            # Add the cut with the correct sign: -g <= -g.T @ lambdas_bar enforces g^T lambda >= g^T lambdas_bar
+            polyhedron.add_ineq_constraint(-g, -g.T @ lambdas_bar)
             
             if abs(UB - LB) <= epsilon:
                 print(f"Converged after {k} iterations.")
@@ -78,11 +102,31 @@ def find_worst_tsp_density_precise_fixed(region: SquareRegion, demands, t: float
         # The f_tilde function constructed from the optimal v_tilde should already integrate to 1.
         # The final returned function is the unnormalized f_tilde.
         print(f"\nAlgorithm finished. Returning density function based on best LB={best_lambdas[1]:.6f}")
-        return lambda x, y: f_tilde_cartesian(x, y, demands_locations, best_lambdas[0], best_v_tilde)
+        density_func = lambda x, y: f_tilde_cartesian(x, y, demands_locations, best_lambdas[0], best_v_tilde)
+        if return_history:
+            history = {'UB': ub_hist, 'LB': lb_hist, 'gap': gap_hist}
+        if return_params and return_history:
+            return density_func, demands_locations, best_lambdas[0], best_v_tilde, history
+        elif return_params:
+            return density_func, demands_locations, best_lambdas[0], best_v_tilde
+        elif return_history:
+            return density_func, history
+        else:
+            return density_func
     else:
         # Fallback to uniform distribution if no solution was found
         print("\nAlgorithm failed to find a solution. Returning uniform distribution.")
-        return lambda x, y: 1.0 / (region.side_length ** 2)
+        density_func = lambda x, y: 1.0 / (region.side_length ** 2)
+        if return_history:
+            history = {'UB': ub_hist, 'LB': lb_hist, 'gap': gap_hist}
+        if return_params and return_history:
+            return density_func, demands_locations, None, None, history
+        elif return_params:
+            return density_func, demands_locations, None, None
+        elif return_history:
+            return density_func, history
+        else:
+            return density_func
 
 def find_min_dist_lambda(demands_locations, lambdas, region):
     """
@@ -112,28 +156,34 @@ def minimize_problem14_cartesian_fixed(demands, lambdas, t, region):
     """
     demands_locations = np.array([d.get_coordinates() for d in demands])
 
-    # For the constraint v0*h(x)+v1 >= 0, we find the minimum of h(x) first.
+    # For the constraint v0*h(x)+v1 >= delta, we find the minimum of h(x) first.
     min_dist_lambda = find_min_dist_lambda(demands_locations, lambdas, region)
+    delta = 1e-4
+    # No warning for negative min_dist_lambda; this is expected if any lambda_j > 0
 
     def objective(v):
-        # v has shape (2,) -> [v0, v1]
         v0, v1 = v[0], v[1]
-        
         integral = compute_upper_bound_integral_fixed(demands_locations, lambdas, v, region)
-        
+        if integral > 1e6:
+            print(f"[Warning] Integral in UB objective is huge ({integral:.2e}). Returning penalty.")
+            return 1e8
         return integral + v0 * t + v1
 
-    # v0 > 0, v1 >= 0
-    # Set a small positive lower bound for v0 to ensure it's non-trivial
-    bounds = [(0, None), (0, None)]
-    
-    # Constraint: v0 * min_dist_lambda + v1 >= 0
-    constraints = [{'type': 'ineq', 'fun': lambda v: v[0] * min_dist_lambda + v[1]}]
-    
-    v_initial_guess = np.ones(2)
-    
+    # v0 >= delta, v1 >= delta
+    bounds = [(delta, None), (delta, None)]
+    # Constraint: v0 * min_dist_lambda + v1 >= delta
+    constraints = [{'type': 'ineq', 'fun': lambda v: v[0] * min_dist_lambda + v[1] - delta}]
+    # Robust initial guess: always feasible
+    v0_init = 1.0
+    v1_init = max(1.0, -v0_init * min_dist_lambda + 2 * delta)
+    v_initial_guess = np.array([v0_init, v1_init])
     res = optimize.minimize(objective, v_initial_guess, method='SLSQP', bounds=bounds, constraints=constraints, options={'disp': False})
-    
+    # Warnings for extreme v0, v1
+    if res.x[0] < 5 * delta or res.x[1] < 5 * delta or res.x[0] > 1e3 or res.x[1] > 1e3:
+        print(f"[Warning] v0 or v1 is extreme: v0={res.x[0]:.2e}, v1={res.x[1]:.2e}")
+    # Warn if the constraint is nearly violated (numerical instability)
+    if res.x[0] * min_dist_lambda + res.x[1] < 1e-6:
+        print(f"[Warning] v0*min_dist_lambda + v1 = {res.x[0] * min_dist_lambda + res.x[1]:.2e} is close to zero. Solution may be numerically unstable.")
     # res.fun is the optimal UB, res.x is the optimal [v0, v1]
     return res.x, res.fun
 

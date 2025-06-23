@@ -125,6 +125,13 @@ class Polyhedron:
         self.ineq_constraints = {'type': 'ineq', 'fun': lambda x: self.b - self.A @ x, 'jac': lambda _: -self.A}
 
     def add_ineq_constraint(self, ai, bi):
+        # Check for near-duplicate or parallel constraints
+        if self.A.shape[0] > 0:
+            for aj in self.A:
+                cos_sim = np.dot(ai, aj) / (np.linalg.norm(ai) * np.linalg.norm(aj) + 1e-12)
+                if abs(cos_sim) > 0.9999:
+                    print("[Polyhedron] Warning: New constraint nearly parallel or duplicate to an existing one. Skipping.")
+                    return
         self.A = np.append(self.A, ai.reshape(1, ai.size), axis=0)
         self.b = np.append(self.b, bi)
         self.update_constraints()
@@ -182,10 +189,10 @@ class Polyhedron:
         res = minimize(
             fun=objective,
             x0=x0_feasible,
-            method='SLSQP',
+            method='trust-constr',
             jac=objective_jac,
             constraints=[self.eq_constraints, self.ineq_constraints],
-            options={'disp': False, 'maxiter': 2000}
+            options={'disp': False, 'maxiter': 1000}
         )
 
         if res.success:
