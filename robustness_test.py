@@ -45,7 +45,7 @@ def run_test(num_demands, num_random_v=5, plot_results=False):
 
     # Run precise method and get parameters and history
     density_func, demands_locations, lambdas_opt, v_tilde_opt, history = find_worst_tsp_density_precise_fixed(
-        region, demands, t=t, epsilon=1e-2, max_iterations=50, tol=1e-5, return_params=True, return_history=True
+        region, demands, t=t, epsilon=1e-2, max_iterations=500, tol=1e-5, return_params=True, return_history=True
     )
     solve_time = time.time() - start_time
 
@@ -124,7 +124,7 @@ def main():
     print("============================================================")
     print("ROBUSTNESS & OPTIMALITY TEST FOR PRECISE METHOD")
     print("============================================================")
-    demand_points_to_test = [5]
+    demand_points_to_test = [10]
     results = {}
     for idx, num_demands in enumerate(demand_points_to_test):
         result = run_test(num_demands, plot_results=True)

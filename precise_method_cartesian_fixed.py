@@ -18,7 +18,8 @@ def find_worst_tsp_density_precise_fixed(region: SquareRegion, demands, t: float
     n = len(demands)
     UB, LB = np.inf, -np.inf
     lambdas_bar = np.zeros(n)
-    bound_value = min(region.side_length, 0.5)
+    # bound_value = min(region.side_length, 0.5)
+    bound_value = region.side_length * np.sqrt(2)
     # For convergence history
     ub_hist, lb_hist, gap_hist = [], [], []
     
@@ -46,6 +47,8 @@ def find_worst_tsp_density_precise_fixed(region: SquareRegion, demands, t: float
         
         try:
             lambdas_bar, _ = polyhedron.find_analytic_center_with_phase1(lambdas_bar)
+            print(f"  ||lambda|| = {np.linalg.norm(lambdas_bar):.6f}")
+            print(f"  sum(lambda) = {np.sum(lambdas_bar):.6e} (should be zero)")
             # demands_locations is fixed, do not update
             
             # --- Corrected Upper Bound Calculation ---
@@ -158,7 +161,7 @@ def minimize_problem14_cartesian_fixed(demands, lambdas, t, region):
 
     # For the constraint v0*h(x)+v1 >= delta, we find the minimum of h(x) first.
     min_dist_lambda = find_min_dist_lambda(demands_locations, lambdas, region)
-    delta = 1e-4
+    delta = 1e-6
     # No warning for negative min_dist_lambda; this is expected if any lambda_j > 0
 
     def objective(v):
