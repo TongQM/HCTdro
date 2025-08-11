@@ -373,4 +373,4 @@ if __name__ == "__main__":
         t=0.3,
         epsilon=0.1,
         grid_sizes=[20, 30, 50]
-    ) 
+    )
