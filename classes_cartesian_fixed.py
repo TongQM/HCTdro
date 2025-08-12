@@ -202,3 +202,134 @@ class Polyhedron:
             print(f"  [Analytic Center] Warning: Scipy failed: {res.message}", flush=True)
             print("  [Analytic Center] Returning last feasible point from Phase I.", flush=True)
             return x0_feasible, -objective(x0_feasible) 
+
+    def find_analytic_center_newton(self, x0=None, max_iters: int = 200, tol: float = 1e-8, verbose: bool = True):
+        """
+        Equality-constrained damped Newton method for the analytic center:
+        minimize -sum_i log(b_i - a_i^T x) subject to B x = c and b - A x > 0.
+
+        Returns (x, phi(x)) where phi is the barrier objective value.
+        """
+        import gurobipy as gp
+        import numpy as np
+
+        # Phase I to get strictly feasible x satisfying Bx=c and b - Ax > 0
+        if verbose:
+            print("  [Analytic Center] (Newton) Phase I for strictly feasible point...")
+        n = self.dim
+        try:
+            with gp.Env(empty=True) as env:
+                env.setParam('OutputFlag', 0)
+                env.start()
+                with gp.Model("phase_I_newton", env=env) as model:
+                    x = model.addMVar(shape=n, lb=-np.inf, name="x")
+                    t = model.addMVar(shape=1, lb=-np.inf, name="t")
+                    model.addConstr(self.A @ x - self.b <= -t)
+                    model.addConstr(self.B @ x == self.c)
+                    model.setObjective(t, gp.GRB.MAXIMIZE)
+                    model.optimize()
+                    if model.status != gp.GRB.OPTIMAL or t.X[0] <= 1e-9:
+                        if verbose:
+                            print("  [Analytic Center] (Newton) Warning: could not certify strict interior; using boundary-feasible point")
+                        xk = x.X
+                    else:
+                        xk = x.X
+                        if verbose:
+                            print(f"  [Analytic Center] (Newton) Phase I slack {t.X[0]:.3e}")
+        except gp.GurobiError as e:
+            if verbose:
+                print(f"  [Analytic Center] (Newton) Gurobi error in Phase I: {e}")
+            # Fallback: zero vector projected to equality constraints
+            # Compute least-squares solution of B x = c
+            BT = self.B.T
+            xk = BT @ np.linalg.pinv(self.B @ BT) @ self.c
+
+        def phi(x):
+            s = self.b - self.A @ x
+            if np.any(s <= 0):
+                return np.inf
+            return -np.sum(np.log(s))
+
+        def grad(x, s=None):
+            if s is None:
+                s = self.b - self.A @ x
+            return self.A.T @ (1.0 / s)
+
+        def hessian(x, s=None):
+            if s is None:
+                s = self.b - self.A @ x
+            W = (1.0 / (s**2))
+            return self.A.T @ (W[:, None] * self.A)
+
+        # Newton iterations
+        for k in range(max_iters):
+            s = self.b - self.A @ xk
+            if np.any(s <= 0):
+                # Step outside; shrink back in
+                if verbose:
+                    print("  [Analytic Center] (Newton) Infeasible iterate encountered; backing off")
+                # small projection towards interior
+                xk = xk * 0.9
+                continue
+            g = grad(xk, s)
+            H = hessian(xk, s)
+
+            # Solve KKT system for equality-constrained Newton step
+            # [H  B^T; B 0] [dx; nu] = [-g; 0]
+            B = self.B
+            zeros = np.zeros((B.shape[0], B.shape[0]))
+            top = np.concatenate([H, B.T], axis=1)
+            bottom = np.concatenate([B, zeros], axis=1)
+            KKT = np.concatenate([top, bottom], axis=0)
+            rhs = -np.concatenate([g, np.zeros(B.shape[0])])
+
+            # Regularize if ill-conditioned
+            try:
+                sol = np.linalg.solve(KKT, rhs)
+            except np.linalg.LinAlgError:
+                if verbose:
+                    print("  [Analytic Center] (Newton) KKT solve failed; adding ridge")
+                ridge = 1e-8
+                Hreg = H + ridge * np.eye(H.shape[0])
+                top = np.concatenate([Hreg, B.T], axis=1)
+                KKT = np.concatenate([top, bottom], axis=0)
+                sol = np.linalg.lstsq(KKT, rhs, rcond=None)[0]
+            dx = sol[:n]
+
+            # Check convergence: small Newton decrement or step
+            if np.linalg.norm(dx) < tol:
+                if verbose:
+                    print(f"  [Analytic Center] (Newton) Converged in {k} iterations")
+                return xk, -phi(xk)
+
+            # Fraction-to-the-boundary step size to keep s > 0
+            Adx = self.A @ dx
+            mask = Adx > 0
+            if np.any(mask):
+                alpha_max = 0.99 * np.min(s[mask] / Adx[mask])
+            else:
+                alpha_max = 1.0
+            alpha = min(1.0, float(alpha_max))
+
+            # Backtracking line search (Armijo)
+            c1 = 1e-4
+            tau = 0.5
+            phi_x = phi(xk)
+            gd = g @ dx
+            while True:
+                x_trial = xk + alpha * dx
+                s_trial = self.b - self.A @ x_trial
+                if np.all(s_trial > 0) and phi(x_trial) <= phi_x + c1 * alpha * gd:
+                    break
+                alpha *= tau
+                if alpha < 1e-12:
+                    # If step becomes too small, accept and stop
+                    if verbose:
+                        print("  [Analytic Center] (Newton) Step too small; stopping")
+                    return xk, -phi_x
+
+            xk = x_trial
+
+        if verbose:
+            print("  [Analytic Center] (Newton) Reached max iterations without convergence")
+        return xk, -phi(xk)

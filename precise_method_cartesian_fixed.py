@@ -46,7 +46,12 @@ def find_worst_tsp_density_precise_fixed(region: SquareRegion, demands, t: float
         starttime = time.time()
         
         try:
-            lambdas_bar, _ = polyhedron.find_analytic_center_with_phase1(lambdas_bar)
+            # Try Newton-based analytic center first, fallback to Phase I + trust-constr
+            try:
+                lambdas_bar, _ = polyhedron.find_analytic_center_newton(lambdas_bar, max_iters=200, tol=1e-8, verbose=True)
+            except Exception as _e:
+                print(f"  [Analytic Center] Newton method failed: {_e}. Falling back to Phase I + trust-constr")
+                lambdas_bar, _ = polyhedron.find_analytic_center_with_phase1(lambdas_bar)
             print(f"  ||lambda|| = {np.linalg.norm(lambdas_bar):.6f}")
             print(f"  sum(lambda) = {np.sum(lambdas_bar):.6e} (should be zero)")
             # demands_locations is fixed, do not update
@@ -134,23 +139,12 @@ def find_worst_tsp_density_precise_fixed(region: SquareRegion, demands, t: float
 def find_min_dist_lambda(demands_locations, lambdas, region):
     """
     Finds the minimum value of min_i{||x - x_i|| - lambda_i} over the whole region R.
-    This is used to handle the semi-infinite constraint in Problem 14.
-    """
-    def objective_func(x):
-        point = np.array(x)
-        modified_distances = [np.linalg.norm(point - demands_locations[i]) - lambdas[i] for i in range(len(demands_locations))]
-        return min(modified_distances)
-
-    bounds = [(region.x_min, region.x_max), (region.y_min, region.y_max)]
-    initial_guesses = np.vstack([demands_locations, [[0,0], [region.x_min, region.y_min], [region.x_max, region.y_max]]])
     
-    min_val = np.inf
-    for guess in initial_guesses:
-        res = optimize.minimize(objective_func, guess, bounds=bounds, method='L-BFGS-B')
-        if res.fun < min_val:
-            min_val = res.fun
-            
-    return min_val
+    Mathematical insight: Since ||x - x_i|| >= 0 for all x, the minimum value of
+    ||x - x_i|| - lambda_i is achieved when ||x - x_i|| = 0 (i.e., x = x_i).
+    Therefore: min_{x∈R} min_i{||x - x_i|| - lambda_i} = min_i{-lambda_i} = -max(lambda).
+    """
+    return -np.max(lambdas)
 
 def minimize_problem14_cartesian_fixed(demands, lambdas, t, region):
     """
@@ -159,10 +153,9 @@ def minimize_problem14_cartesian_fixed(demands, lambdas, t, region):
     """
     demands_locations = np.array([d.get_coordinates() for d in demands])
 
-    # For the constraint v0*h(x)+v1 >= delta, we find the minimum of h(x) first.
+    # For the constraint v0*h(x)+v1 >= 0, we find the minimum of h(x) first.
     min_dist_lambda = find_min_dist_lambda(demands_locations, lambdas, region)
-    delta = 1e-6
-    # No warning for negative min_dist_lambda; this is expected if any lambda_j > 0
+    # Original formulation uses >= 0, not >= delta
 
     def objective(v):
         v0, v1 = v[0], v[1]
@@ -172,21 +165,21 @@ def minimize_problem14_cartesian_fixed(demands, lambdas, t, region):
             return 1e8
         return integral + v0 * t + v1
 
-    # v0 >= delta, v1 >= delta
-    bounds = [(delta, None), (delta, None)]
-    # Constraint: v0 * min_dist_lambda + v1 >= delta
-    constraints = [{'type': 'ineq', 'fun': lambda v: v[0] * min_dist_lambda + v[1] - delta}]
-    # Robust initial guess: always feasible
+    # Original formulation: v0, v1 >= 0 (no artificial lower bound)
+    bounds = [(0.0, None), (0.0, None)]
+    # Constraint: v0 * min_dist_lambda + v1 >= 0 (original formulation)
+    constraints = [{'type': 'ineq', 'fun': lambda v: v[0] * min_dist_lambda + v[1]}]
+    # Initial guess: always feasible for original constraint
     v0_init = 1.0
-    v1_init = max(1.0, -v0_init * min_dist_lambda + 2 * delta)
+    v1_init = max(1.0, -v0_init * min_dist_lambda + 0.1)  # Small margin above 0
     v_initial_guess = np.array([v0_init, v1_init])
     res = optimize.minimize(objective, v_initial_guess, method='SLSQP', bounds=bounds, constraints=constraints, options={'disp': False})
     # Warnings for extreme v0, v1
-    if res.x[0] < 5 * delta or res.x[1] < 5 * delta or res.x[0] > 1e3 or res.x[1] > 1e3:
+    if res.x[0] < 1e-6 or res.x[1] < 1e-6 or res.x[0] > 1e3 or res.x[1] > 1e3:
         print(f"[Warning] v0 or v1 is extreme: v0={res.x[0]:.2e}, v1={res.x[1]:.2e}")
     # Warn if the constraint is nearly violated (numerical instability)
-    if res.x[0] * min_dist_lambda + res.x[1] < 1e-6:
-        print(f"[Warning] v0*min_dist_lambda + v1 = {res.x[0] * min_dist_lambda + res.x[1]:.2e} is close to zero. Solution may be numerically unstable.")
+    if res.x[0] * min_dist_lambda + res.x[1] < -1e-6:
+        print(f"[Warning] v0*min_dist_lambda + v1 = {res.x[0] * min_dist_lambda + res.x[1]:.2e} violates constraint.")
     # res.fun is the optimal UB, res.x is the optimal [v0, v1]
     return res.x, res.fun
 

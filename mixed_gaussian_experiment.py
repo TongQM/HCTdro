@@ -2,6 +2,7 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import Tuple, List
+import argparse
 
 from classes_cartesian_fixed import SquareRegion, Demand, Coordinate
 from precise_method_cartesian_fixed import find_worst_tsp_density_precise_fixed
@@ -83,6 +84,13 @@ def compare_densities_on_grid(
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--t', type=float, default=1.0, help='Wasserstein radius t')
+    parser.add_argument('--grid_size', type=int, default=50, help='SDP grid size per axis')
+    parser.add_argument('--num_demands', type=int, default=30, help='Number of sampled demands')
+    parser.add_argument('--seed', type=int, default=7, help='Random seed for sampling')
+    args = parser.parse_args()
+
     # 10x10 miles square region centered at 0
     region = SquareRegion(side_length=10.0)
 
@@ -92,11 +100,11 @@ def main():
     weights = [0.6, 0.4]
 
     # Common parameters
-    num_demands = 30
-    t = 1.0
+    num_demands = args.num_demands
+    t = args.t
     epsilon = 0.05
-    grid_size = 50  # for SDP
-    seed = 7
+    grid_size = args.grid_size  # for SDP
+    seed = args.seed
 
     # Sample nominal demands from truncated mixture
     pts = sample_truncated_mixture_gaussians(
@@ -119,7 +127,7 @@ def main():
         epsilon=epsilon,
         tol=1e-4,
         use_torchquad=True,
-        max_iterations=50,
+        max_iterations=150,
     )
     accpm_time = time.time() - t0
     print(f"ACCPM time: {accpm_time:.2f}s")

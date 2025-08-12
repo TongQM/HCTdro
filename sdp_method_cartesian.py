@@ -45,8 +45,8 @@ def find_worst_tsp_density_sdp(region: SquareRegion, demands, t: float = 1, grid
             distances[i, j] = np.linalg.norm(grid_points[i] - demands_locations[j])
     
     # Area of each grid cell
-    dx = (region.x_max - region.x_min) / (grid_size - 1)
-    dy = (region.y_max - region.y_min) / (grid_size - 1)
+    dx = (region.x_max - region.x_min) / grid_size
+    dy = (region.y_max - region.y_min) / grid_size
     cell_area = dx * dy
     
     # Create empirical distribution (uniform mass at demand points)
@@ -185,8 +185,8 @@ def find_worst_tsp_density_sdp_improved(region: SquareRegion, demands, t: float 
             distances[i, j] = np.linalg.norm(grid_points[i] - demands_locations[j])
     
     # Area of each grid cell
-    dx = (region.x_max - region.x_min) / (grid_size - 1)
-    dy = (region.y_max - region.y_min) / (grid_size - 1)
+    dx = (region.x_max - region.x_min) / grid_size
+    dy = (region.y_max - region.y_min) / grid_size
     cell_area = dx * dy
     
     # Create empirical distribution
@@ -352,8 +352,8 @@ def find_worst_tsp_density_sdp_simple(region: SquareRegion, demands, t: float = 
     print(f"Grid has {n_grid_points} points, {n_demands} demand points")
     
     # Area of each grid cell
-    dx = (region.x_max - region.x_min) / (grid_size - 1)
-    dy = (region.y_max - region.y_min) / (grid_size - 1)
+    dx = (region.x_max - region.x_min) / grid_size
+    dy = (region.y_max - region.y_min) / grid_size
     cell_area = dx * dy
     
     # Create Gurobi model

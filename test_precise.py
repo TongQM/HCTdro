@@ -6,28 +6,81 @@ Test script for the debugged precise method
 import argparse
 import time
 import numpy as np
+import matplotlib.pyplot as plt
 from classes_cartesian_fixed import SquareRegion, DemandsGenerator, Demand, EmpiricalDistribution, CartesianGrid, Coordinate
 from precise_method_cartesian_fixed import find_worst_tsp_density_precise_fixed
 from scipy import integrate
+
+def plot_distribution(density_func, region, demands, num_demands, t, solve_time):
+    """Plot the final worst-case distribution and demand points."""
+    # Create a grid for plotting
+    grid_size = 100  # Increased resolution for finer detail
+    x = np.linspace(region.x_min, region.x_max, grid_size)
+    y = np.linspace(region.y_min, region.y_max, grid_size)
+    X, Y = np.meshgrid(x, y)
+    
+    # Evaluate density function on the grid
+    Z = np.zeros_like(X)
+    for i in range(grid_size):
+        for j in range(grid_size):
+            try:
+                Z[i, j] = density_func(X[i, j], Y[i, j])
+            except:
+                Z[i, j] = 0  # Handle any evaluation errors
+    
+    # Create the plot
+    plt.figure(figsize=(10, 8))
+    
+    # Plot density as contour/heatmap
+    contour = plt.contourf(X, Y, Z, levels=50, cmap='viridis', alpha=0.8)  # More contour levels for finer detail
+    plt.colorbar(contour, label='Density')
+    
+    # Plot demand points
+    demand_coords = np.array([d.get_coordinates() for d in demands])
+    plt.scatter(demand_coords[:, 0], demand_coords[:, 1], 
+                c='red', s=100, marker='o', edgecolors='white', linewidth=2,
+                label=f'Demand Points ({num_demands})', zorder=5)
+    
+    # Add labels and title
+    plt.xlabel('X coordinate')
+    plt.ylabel('Y coordinate')
+    plt.title(f'Worst-Case Distribution (ACCMP)\n'
+              f'n={num_demands}, t={t}, time={solve_time:.1f}s')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.axis('equal')
+    
+    # Set axis limits to region bounds
+    plt.xlim(region.x_min, region.x_max)
+    plt.ylim(region.y_min, region.y_max)
+    
+    # Save the plot
+    filename = f'figs/accmp_distribution_n{num_demands}_t{t:.1f}.png'
+    plt.savefig(filename, dpi=150, bbox_inches='tight')
+    print(f"Distribution plot saved to: {filename}")
+    
+    plt.close()  # Close to avoid display issues
 
 def main():
     parser = argparse.ArgumentParser(description="Test the fixed precise method with a variable number of demands.")
     parser.add_argument('--num_demands', type=int, default=5, help='Number of demand points to test.')
     parser.add_argument('--max_iterations', type=int, default=5, help='Maximum number of analytic center iterations to allow.')
     parser.add_argument('--epsilon', type=float, default=0.2, help='Convergence tolerance epsilon.')
+    parser.add_argument('--t', type=float, default=0.5, help='Wasserstein radius for the ball constraint.')
     args = parser.parse_args()
 
     num_demands = args.num_demands
     max_iter = args.max_iterations
     epsilon = args.epsilon
+    t = args.t
     
     print("============================================================")
     print("TESTING FIXED PRECISE METHOD")
     print("============================================================")
     
     # Test configuration
-    region = SquareRegion(side_length=1.0)
-    grid = CartesianGrid(size=10, side_length=1.0) # Create a grid
+    region = SquareRegion(side_length=10.0)  # 10x10 square service region
+    grid = CartesianGrid(size=10, side_length=10.0) # Create a grid
     
     # Create demands and corresponding empirical distribution on the grid
     empirical_distribution = EmpiricalDistribution(grid)
@@ -37,6 +90,7 @@ def main():
     print("Test configuration:")
     print(f"  Region: {region}")
     print(f"  Number of demands: {num_demands}")
+    print(f"  Wasserstein radius t: {t}")
     print(f"  Epsilon: {epsilon} (more relaxed)")
     print(f"  Max iterations: {max_iter}")
     
@@ -49,6 +103,7 @@ def main():
         returned_density_func = find_worst_tsp_density_precise_fixed(
             region,
             demands,
+            t=t,
             epsilon=epsilon,
             max_iterations=max_iter,
             tol=1e-3  # Looser tolerance for testing
@@ -88,6 +143,10 @@ def main():
             print("Integral test PASSED: The integral is close to 1.")
         else:
             print("Integral test FAILED: The integral is not close to 1.")
+        
+        # Plot the final distribution
+        print("\n--- Plotting Final Distribution ---")
+        plot_distribution(returned_density_func, region, demands, num_demands, t, solve_time)
         
         print("\nThe fixed precise method works!")
         print(f"Solve time: {solve_time:.2f} seconds")
